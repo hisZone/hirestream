@@ -1,0 +1,11 @@
+.git
+.github
+.husky
+.phpunit.result.cache
+tests
+node_modules
+dockerfiles/nginx
+compose.override.yaml*
+.env
+.env.*
+!.env.example

@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build & compiled outputs
+dist/
+dist-ssr/
+build/
+public/build/
+public/hot
+public/storage
+
+# Logs & Cache
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.phpunit.cache
+.phpunit.result.cache
+
+# SQLite & local database dumps
+*.sqlite
+*.sqlite-journal
+*.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.fleet/
+.zed/
+
+# Agent / Tooling internal files
+.agents/
+AGENTS.md
+skills-lock.json

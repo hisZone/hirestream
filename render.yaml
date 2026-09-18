@@ -1,0 +1,77 @@
+databases:
+  - name: job-listing-db
+    databaseName: job_listing_platform
+    user: job_listing_user
+    plan: free
+    region: oregon
+
+services:
+  - type: web
+    name: job-listing-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Backend/Dockerfile
+    dockerContext: ./Backend
+    healthCheckPath: /up
+    envVars:
+      - key: APP_NAME
+        value: "Job Listing Platform"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: APP_FRONTEND_URL
+        sync: false
+      - key: SANCTUM_STATEFUL_DOMAINS
+        sync: false
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: job-listing-db
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: job-listing-db
+          property: connectionString
+      - key: DB_HOST
+        fromDatabase:
+          name: job-listing-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: job-listing-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: job-listing-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: job-listing-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: job-listing-db
+          property: password
+      - key: DB_SSLMODE
+        value: prefer
+      - key: CACHE_STORE
+        value: database
+      - key: SESSION_DRIVER
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: info
+      - key: RUN_MIGRATIONS
+        value: "true"
