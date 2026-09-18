@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ActivityLogger
 {
@@ -29,7 +30,12 @@ class ActivityLogger
             'timestamp' => now()->toIso8601String(),
         ], $extra);
 
-        Log::channel(self::$channel)->info($description ?? $action, $data);
+        try {
+            Log::channel(self::$channel)->info($description ?? $action, $data);
+        } catch (Throwable) {
+            // Fallback to default application logger if activity channel is not writable
+            Log::info($description ?? $action, $data);
+        }
     }
 
     public static function auth(string $action, ?Request $request = null): void

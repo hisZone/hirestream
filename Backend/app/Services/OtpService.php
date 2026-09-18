@@ -6,7 +6,9 @@ use App\Mail\OtpCodeMail;
 use App\Models\Otp;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class OtpService
 {
@@ -37,7 +39,16 @@ class OtpService
             'expires_at' => now()->addMinutes(self::EXPIRY_MINUTES),
         ]);
 
-        Mail::to($user->email)->send(new OtpCodeMail($plainCode, self::EXPIRY_MINUTES));
+        try {
+            Mail::to($user->email)->send(new OtpCodeMail($plainCode, self::EXPIRY_MINUTES));
+        } catch (Throwable $e) {
+            Log::error('Failed to dispatch OTP email: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'purpose' => $purpose,
+            ]);
+            throw $e;
+        }
 
         return $otp;
     }

@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -56,6 +57,8 @@ class AuthController extends Controller
                 return AuthResource::make($user, $token);
             });
         } catch (Exception $e) {
+            Log::error('Registration exception: ' . $e->getMessage(), ['exception' => $e]);
+
             return $this->error(
                 __('auth.register_error'),
                 500,
@@ -180,6 +183,7 @@ class AuthController extends Controller
     /**
      * Verify Email
      *
+     * @param  Request  $request
      * @return JsonResponse
      */
     public function verifyEmailOtp(Request $request): JsonResponse
@@ -207,6 +211,7 @@ class AuthController extends Controller
     /**
      * Resend Verification OTP
      *
+     * @param  Request  $request
      * @return JsonResponse
      */
     public function resendVerificationEmail(Request $request): JsonResponse
