@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth'
+import { API_BASE_URL } from '@/lib/api'
 import type { EmployerNotification } from '@/types'
 
 export function useEmployerRealtimeNotifications() {
@@ -26,7 +27,7 @@ export function useEmployerRealtimeNotifications() {
       abortControllerRef.current = new AbortController()
 
       try {
-        const response = await fetch('/api/v1/employer/notifications/stream', {
+        const response = await fetch(`${API_BASE_URL}/employer/notifications/stream`, {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'text/event-stream',
@@ -50,63 +51,43 @@ export function useEmployerRealtimeNotifications() {
 
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split('\n\n')
-          buffer = lines.pop() ?? ''
+          buffer = lines.pop() || ''
 
-          for (const chunk of lines) {
-            if (!chunk.trim()) continue
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed.startsWith('data:')) continue
 
-            const eventMatch = chunk.match(/^event:\s*(.+)$/m)
-            const dataMatch = chunk.match(/^data:\s*(.+)$/m)
+            const dataString = trimmed.replace(/^data:\s*/, '')
+            if (!dataString) continue
 
-            const eventType = eventMatch ? eventMatch[1].trim() : 'message'
-            const eventData = dataMatch ? dataMatch[1].trim() : ''
+            try {
+              const notification: EmployerNotification = JSON.parse(dataString)
 
-            if (eventType === 'notification' && eventData) {
-              try {
-                const notification = JSON.parse(eventData) as EmployerNotification
+              queryClient.setQueryData(
+                ['employer-notifications-unread-count'],
+                (prev: number = 0) => prev + 1
+              )
 
-                // Immediately update unread count badge
-                if (typeof notification.unread_count === 'number') {
-                  queryClient.setQueryData(['employer-notifications-unread-count'], notification.unread_count)
-                } else {
-                  queryClient.setQueryData(['employer-notifications-unread-count'], (old: number | undefined) => (old ?? 0) + 1)
-                }
+              queryClient.invalidateQueries({ queryKey: ['employer-notifications'] })
 
-                // Invalidate query caches for background consistency
-                queryClient.invalidateQueries({ queryKey: ['employer-notifications'] })
-                queryClient.invalidateQueries({ queryKey: ['employer-notifications-unread-count'] })
-
-                // Pop interactive toast notification
-                const title = notification.data?.title ?? 'New Notification'
-                const message = notification.data?.message ?? 'You have received a new update.'
-                const actionUrl = notification.data?.action_url
-
-                toast.info(title, {
-                  description: message,
-                  duration: 8000,
-                  action: actionUrl
-                    ? {
-                        label: 'View',
-                        onClick: () => navigate(actionUrl),
-                      }
-                    : undefined,
-                })
-              } catch (e) {
-                console.error('Failed to parse incoming notification:', e)
-              }
+              toast(notification.title, {
+                description: notification.message,
+                action: notification.action_url
+                  ? {
+                      label: 'View',
+                      onClick: () => navigate(notification.action_url!),
+                    }
+                  : undefined,
+              })
+            } catch {
+              // Ignore malformed JSON chunks
             }
           }
         }
-      } catch (err: unknown) {
-        isConnectingRef.current = false
-        if (err instanceof Error && err.name === 'AbortError') {
-          return
-        }
+      } catch {
+        // Suppress stream abort/network errors on cleanup
       } finally {
         isConnectingRef.current = false
-        if (isActive) {
-          setTimeout(connectToStream, 3000)
-        }
       }
     }
 
