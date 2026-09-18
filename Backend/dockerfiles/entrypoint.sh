@@ -8,10 +8,20 @@ RENDER_PORT="${PORT:-10000}"
 echo "==> [Render] Setting Nginx listen port to ${RENDER_PORT}..."
 sed -i "s/PORT_PLACEHOLDER/${RENDER_PORT}/g" /etc/nginx/http.d/default.conf
 
-# Fallback: ensure APP_KEY is set
+# Fallback: ensure APP_KEY is set and correctly formatted
 if [ -z "$APP_KEY" ]; then
     echo "==> [Render] Notice: APP_KEY is not set in environment. Generating temporary key..."
     export APP_KEY="$(php artisan key:generate --show)"
+else
+    case "$APP_KEY" in
+        base64:*) ;;
+        *)
+            if [ ${#APP_KEY} -eq 44 ]; then
+                echo "==> [Render] Notice: Automatically adding base64: prefix to APP_KEY..."
+                export APP_KEY="base64:${APP_KEY}"
+            fi
+            ;;
+    esac
 fi
 
 # Fallback: link RENDER_EXTERNAL_URL to APP_URL if APP_URL is unset or localhost
