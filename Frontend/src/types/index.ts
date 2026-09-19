@@ -1,48 +1,48 @@
-export type UserRole = 'admin' | 'employer' | 'employee'
+// Re-export all model types
+export * from './job'
+export * from './category'
+export * from './application'
+export * from './user'
+export type { EmployeeNotification } from '@/services/employeeNotificationService'
 
-export interface User {
-  id: number
-  name: string
-  email: string
-  username: string
-  role: UserRole
-  role_label?: string
-  email_verified_at: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface AuthResponse {
-  user: User
-  access_token: string
-  token_type: string
-  expires_at?: string
-}
-
-export interface LoginRequest {
-  login: string
-  password: string
-  remember_me?: boolean
-}
-
-export interface RegisterRequest {
-  name: string
-  email: string
-  username: string
-  password: string
-  password_confirmation: string
-  role: UserRole
-  remember_me?: boolean
-}
-
-export interface ApiResponse<T> {
-  data: T
+// Generic API response structure
+export interface ApiResponse<T = unknown> {
+  success: boolean
   message?: string
+  data?: T
+  meta?: PaginationMeta
+  errors?: Record<string, string[]>
 }
 
-export interface ApiError {
-  message: string
-  errors?: Record<string, string[]>
+// Pagination metadata returned by Laravel length-aware paginator
+export interface PaginationMeta {
+  current_page: number
+  last_page: number
+  per_page: number
+  total: number
+  from: number | null
+  to: number | null
+}
+
+// Common filter and search query parameters
+export interface QueryParams {
+  page?: number
+  per_page?: number
+  search?: string
+  sort_by?: string
+  sort_direction?: 'asc' | 'desc'
+  [key: string]: unknown
+}
+
+// Navigation item structure for sidebars and menus
+export interface NavItem {
+  title: string
+  href: string
+  icon?: React.ComponentType<{ className?: string }>
+  badge?: string | number
+  disabled?: boolean
+  external?: boolean
+  children?: NavItem[]
 }
 
 export interface AdminNotificationData {
@@ -60,6 +60,9 @@ export interface AdminNotificationData {
 export interface AdminNotification {
   id: string
   type: string
+  title?: string
+  message?: string
+  action_url?: string
   data: AdminNotificationData
   read_at: string | null
   is_read: boolean
@@ -87,6 +90,9 @@ export interface EmployerNotificationData {
 export interface EmployerNotification {
   id: string
   type: string
+  title?: string
+  message?: string
+  action_url?: string
   data: EmployerNotificationData
   read_at: string | null
   is_read: boolean
@@ -98,56 +104,16 @@ export interface EmployerNotification {
 export type InterviewType = 'video' | 'in_person' | 'phone'
 export type InterviewStatus = 'scheduled' | 'rescheduled' | 'completed' | 'cancelled'
 
-export interface InterviewItem {
+export interface InterviewSchedule {
   id: number
-  application_id: number
-  employer_id: number
-  user_id: number
-  job_post_id: number
-  title: string
-  type: InterviewType
+  job_application_id: number
   scheduled_at: string
-  scheduled_at_formatted?: string
-  duration_minutes: number
-  timezone?: string
+  interview_type: InterviewType
   meeting_link?: string | null
   location?: string | null
   notes?: string | null
   status: InterviewStatus
-  created_at?: string
-  updated_at?: string
-}
-
-export interface JobPost {
-  id: number
-  employer_id?: number
-  category_id?: number
-  title: string
-  slug: string
-  description?: string
-  requirements?: string[]
-  responsibilities?: string[]
-  job_type?: string
-  experience_level?: string
-  location?: string | null
-  salary_min?: number | null
-  salary_max?: number | null
-  salary_currency?: string
-  is_remote?: boolean
-  status?: string
-  employer?: {
-    id?: number
-    company_name?: string
-    logo?: string | null
-    location?: string | null
-  } | null
-  category?: {
-    id?: number
-    name?: string
-    slug?: string
-  } | null
-  published_at?: string | null
-  expires_at?: string | null
-  created_at?: string
-  updated_at?: string
+  cancellation_reason?: string | null
+  created_at: string
+  updated_at: string
 }
