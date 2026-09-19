@@ -70,7 +70,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
     if (user.role === 'employer') {
-      navigate('/employer-dashboard', { replace: true })\n    } else if (user.role === 'admin') {
+      navigate('/employer-dashboard', { replace: true })
+    } else if (user.role === 'admin') {
       navigate('/admin', { replace: true })
     }
   }, [user, navigate])
@@ -108,7 +109,8 @@ export default function DashboardPage() {
   const recent = applications.slice(0, 5)
 
   const stats = [
-    {\n      label: t('dashboard.totalApplied'),
+    {
+      label: t('dashboard.totalApplied'),
       value: total,
       icon: Briefcase,
       badge: 'All time',
