@@ -27,8 +27,8 @@ const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
       const nextValue = next.join("")
       onChange(nextValue)
 
-      if (nextValue.length === length && !nextValue.includes("")) {
-        onComplete?.(nextValue)
+      if (next.every((d) => d.length === 1 && /\d/.test(d))) {
+        onComplete?.(next.join(""))
       }
     }
 
@@ -41,7 +41,13 @@ const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
     }
 
     const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Backspace") {
+      if (e.key === "Enter") {
+        e.preventDefault()
+        const fullVal = digits.join("")
+        if (fullVal.length === length && !digits.includes("")) {
+          onComplete?.(fullVal)
+        }
+      } else if (e.key === "Backspace") {
         if (digits[index]) {
           setDigit(index, "")
         } else if (index > 0) {

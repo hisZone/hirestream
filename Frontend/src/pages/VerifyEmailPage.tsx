@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { MailCheck, LogOut } from 'lucide-react'
+import { MailCheck, LogOut, Loader2, ArrowRight } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { OtpInput } from '@/components/ui/otp-input'
 import { ResendTimer } from '@/components/ui/resend-timer'
 import AuthLayout from '@/components/AuthLayout'
@@ -32,7 +33,7 @@ export default function VerifyEmailPage() {
     },
     onError: () => {
       setError(true)
-      toast.error(t('otp.invalidCode'))
+      toast.error(t('otp.invalidCode', 'Invalid or expired code. Please try again.'))
     },
   })
 
@@ -40,8 +41,22 @@ export default function VerifyEmailPage() {
     mutationFn: () => api.post('/email/resend'),
   })
 
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode)
+    if (error) setError(false)
+  }
+
   const handleComplete = (submittedCode: string) => {
-    verifyMutation.mutate(submittedCode)
+    if (!verifyMutation.isPending) {
+      verifyMutation.mutate(submittedCode)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (code.length === 6 && !verifyMutation.isPending) {
+      verifyMutation.mutate(code)
+    }
   }
 
   const handleResend = async () => {
@@ -65,22 +80,42 @@ export default function VerifyEmailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <OtpInput
-              value={code}
-              onChange={setCode}
-              onComplete={handleComplete}
-              disabled={verifyMutation.isPending}
-              error={error}
-            />
-            <ResendTimer onResend={handleResend} />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-3">
+              <OtpInput
+                value={code}
+                onChange={handleCodeChange}
+                onComplete={handleComplete}
+                disabled={verifyMutation.isPending}
+                error={error}
+              />
+              <ResendTimer onResend={handleResend} />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={code.length !== 6 || verifyMutation.isPending}
+              className="w-full gap-2 cursor-pointer font-medium"
+            >
+              {verifyMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{t('otp.verifying', 'Verifying...')}</span>
+                </>
+              ) : (
+                <>
+                  <span>{t('otp.verify', 'Verify')}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </Button>
+          </form>
 
           <div className="pt-2 border-t border-border/60">
             <button
               type="button"
               onClick={() => logout()}
-              className="inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 w-full text-center transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 w-full text-center transition-colors cursor-pointer"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>{t('auth.logout')}</span>

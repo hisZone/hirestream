@@ -1,61 +1,73 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth'
 import { API_BASE_URL } from '@/lib/api'
-import type { EmployeeNotification } from '@/services/employeeNotificationService'
+import type { EmployeeNotification } from '@/types'
 
+/**
+ * Hook to consume real-time employee notification Server-Sent Events (SSE).
+ *
+ * Uses fetch + ReadableStream to support sending Sanctum Bearer tokens
+ * in the Authorization header.
+ *
+ * Automatically invalidates employee notification queries on new notifications
+ * and shows a toast alert.
+ */
 export function useEmployeeRealtimeNotifications() {
-  const { user, token, isAuthenticated } = useAuthStore()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const { user, token } = useAuthStore()
   const abortControllerRef = useRef<AbortController | null>(null)
   const isConnectingRef = useRef(false)
 
+  const isEmployee = user?.role === 'employee'
+
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'employee' || !token) {
+    if (!isEmployee || !token) {
       return
     }
 
-    let isActive = true
+    // Prevent duplicate concurrent stream connections
+    if (isConnectingRef.current) {
+      return
+    }
 
-    const connectToStream = async () => {
-      if (!isActive || isConnectingRef.current) return
-      isConnectingRef.current = true
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
+    isConnectingRef.current = true
 
-      abortControllerRef.current = new AbortController()
-
+    const connectStream = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/employee/notifications/stream`, {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: 'text/event-stream',
           },
-          signal: abortControllerRef.current.signal,
+          signal: abortController.signal,
         })
 
         if (!response.ok || !response.body) {
-          throw new Error(`SSE stream failed with status ${response.status}`)
+          isConnectingRef.current = false
+          return
         }
 
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
 
-        isConnectingRef.current = false
-
-        while (isActive) {
+        while (true) {
           const { done, value } = await reader.read()
           if (done) break
 
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split('\n\n')
-          buffer = lines.pop() || ''
+          buffer = lines.pop() ?? ''
 
-          for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed.startsWith('data:')) continue
+          for (const chunk of lines) {
+            const trimmed = chunk.trim()
+            if (!trimmed || !trimmed.startsWith('data:')) continue
 
             const dataString = trimmed.replace(/^data:\s*/, '')
             if (!dataString) continue
@@ -70,12 +82,16 @@ export function useEmployeeRealtimeNotifications() {
 
               queryClient.invalidateQueries({ queryKey: ['employee-notifications'] })
 
-              toast(notification.title, {
-                description: notification.message,
-                action: notification.action_url
+              const title = notification.data?.title ?? 'New Notification'
+              const message = notification.data?.message
+              const actionUrl = notification.data?.action_url
+
+              toast(title, {
+                description: message,
+                action: actionUrl
                   ? {
                       label: 'View',
-                      onClick: () => navigate(notification.action_url!),
+                      onClick: () => navigate(actionUrl),
                     }
                   : undefined,
               })
@@ -91,13 +107,12 @@ export function useEmployeeRealtimeNotifications() {
       }
     }
 
-    connectToStream()
+    connectStream()
 
     return () => {
-      isActive = false
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
+      abortController.abort()
+      abortControllerRef.current = null
+      isConnectingRef.current = false
     }
-  }, [isAuthenticated, user?.role, token, queryClient, navigate])
+  }, [isEmployee, token, queryClient, navigate])
 }
