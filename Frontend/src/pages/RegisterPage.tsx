@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import {
@@ -13,19 +14,31 @@ import {
   EyeOff,
   AlertCircle,
   Loader2,
+  MailCheck,
+  ArrowRight,
+  RotateCcw,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { OtpInput } from '@/components/ui/otp-input'
+import { ResendTimer } from '@/components/ui/resend-timer'
 import AuthLayout from '@/components/AuthLayout'
+import api from '@/lib/api'
 import axios from 'axios'
 
 export default function RegisterPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { register: registerUser, isLoading } = useAuthStore()
+  const { register: registerUser, getProfile, isLoading } = useAuthStore()
+
+  const [step, setStep] = useState<'register' | 'verify'>('register')
+  const [registeredEmail, setRegisteredEmail] = useState('')
+  const [registeredRole, setRegisteredRole] = useState<'employee' | 'employer'>('employee')
+  const [code, setCode] = useState('')
+  const [otpError, setOtpError] = useState(false)
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -67,8 +80,10 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     try {
       await registerUser(data)
-      toast.success('Account created successfully')
-      navigate('/verify-email')
+      setRegisteredEmail(data.email)
+      setRegisteredRole(data.role)
+      setStep('verify')
+      toast.success(t('auth.registerSuccess', 'Account created! Please check your email for the verification code.'))
     } catch (error: unknown) {
       if (axios.isAxiosError(error) && error.response?.data) {
         const serverData = error.response.data
@@ -98,6 +113,132 @@ export default function RegisterPage() {
     }
   }
 
+  // OTP Verification Mutation
+  const verifyMutation = useMutation({
+    mutationFn: (submittedCode: string) => api.post('/email/verify-otp', { code: submittedCode }),
+    onSuccess: async () => {
+      toast.success(t('auth.emailVerified', 'Email verified successfully!'))
+      const updatedUser = await getProfile()
+      if (updatedUser?.role === 'employer' || registeredRole === 'employer') {
+        navigate('/employer-dashboard')
+      } else {
+        navigate('/dashboard')
+      }
+    },
+    onError: () => {
+      setOtpError(true)
+      toast.error(t('otp.invalidCode', 'Invalid or expired code. Please try again.'))
+    },
+  })
+
+  // OTP Resend Mutation
+  const resendMutation = useMutation({
+    mutationFn: () => api.post('/email/resend'),
+    onSuccess: () => {
+      toast.success('A new verification code has been sent to your email.')
+    },
+    onError: () => {
+      toast.error('Failed to resend code. Please wait before trying again.')
+    },
+  })
+
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode)
+    if (otpError) setOtpError(false)
+  }
+
+  const handleVerifySubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (code.length === 6 && !verifyMutation.isPending) {
+      verifyMutation.mutate(code)
+    }
+  }
+
+  const handleResend = async () => {
+    await resendMutation.mutateAsync()
+    setCode('')
+    setOtpError(false)
+  }
+
+  // Render Step 2: OTP Verification Card
+  if (step === 'verify') {
+    return (
+      <AuthLayout>
+        <Card className="border border-border/70 shadow-lg shadow-black/5 dark:shadow-none">
+          <CardHeader className="text-center pb-4">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary/10 text-sidebar-primary mb-2 shadow-2xs">
+              <MailCheck className="h-5 w-5" />
+            </div>
+            <CardTitle className="text-xl font-bold tracking-tight text-foreground">
+              {t('otp.registerTitle', 'Verify your email')}
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              {t('otp.codeSentTo', { email: registeredEmail || 'your email' })}
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
+            <form onSubmit={handleVerifySubmit} className="space-y-4">
+              <div className="space-y-3">
+                <OtpInput
+                  value={code}
+                  onChange={handleCodeChange}
+                  onComplete={(val) => {
+                    if (!verifyMutation.isPending) {
+                      verifyMutation.mutate(val)
+                    }
+                  }}
+                  autoSubmit={false}
+                  disabled={verifyMutation.isPending}
+                  error={otpError}
+                />
+                <ResendTimer onResend={handleResend} />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={code.length !== 6 || verifyMutation.isPending}
+                className="w-full gap-2 cursor-pointer font-medium"
+              >
+                {verifyMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>{t('otp.verifying', 'Verifying...')}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{t('otp.verify', 'Verify & Continue')}</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </form>
+
+            <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('register')
+                  setCode('')
+                  setOtpError(false)
+                }}
+                className="inline-flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>Wrong email? Re-enter</span>
+              </button>
+
+              <Link to="/login" className="hover:text-foreground transition-colors">
+                {t('auth.login', 'Log In')}
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </AuthLayout>
+    )
+  }
+
+  // Render Step 1: Initial Registration Form
   return (
     <AuthLayout>
       <Card className="border border-border/70 shadow-lg shadow-black/5 dark:shadow-none">

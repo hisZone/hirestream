@@ -6,13 +6,14 @@ interface OtpInputProps {
   value: string
   onChange: (value: string) => void
   onComplete?: (value: string) => void
+  autoSubmit?: boolean
   disabled?: boolean
   error?: boolean
   className?: string
 }
 
 const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
-  ({ length = 6, value, onChange, onComplete, disabled, error, className }, ref) => {
+  ({ length = 6, value, onChange, onComplete, autoSubmit = false, disabled, error, className }, ref) => {
     const inputRefs = React.useRef<(HTMLInputElement | null)[]>([])
 
     const digits = React.useMemo(() => {
@@ -27,7 +28,7 @@ const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
       const nextValue = next.join("")
       onChange(nextValue)
 
-      if (next.every((d) => d.length === 1 && /\d/.test(d))) {
+      if (autoSubmit && next.every((d) => d.length === 1 && /\d/.test(d))) {
         onComplete?.(next.join(""))
       }
     }
@@ -68,7 +69,9 @@ const OtpInput = React.forwardRef<HTMLDivElement, OtpInputProps>(
       onChange(pasted.padEnd(length, "").slice(0, length).replace(/ /g, ""))
       const filled = pasted.length
       if (filled === length) {
-        onComplete?.(pasted)
+        if (autoSubmit) {
+          onComplete?.(pasted)
+        }
         inputRefs.current[length - 1]?.focus()
       } else {
         inputRefs.current[Math.min(filled, length - 1)]?.focus()
