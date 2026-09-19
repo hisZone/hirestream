@@ -23,9 +23,11 @@ export function useEmployeeRealtimeNotifications() {
   const isConnectingRef = useRef(false)
 
   const isEmployee = user?.role === 'employee'
+  const isVerified = Boolean(user?.email_verified_at)
 
   useEffect(() => {
-    if (!isEmployee || !token) {
+    // Only connect if user is an employee, authenticated, and verified
+    if (!isEmployee || !token || !isVerified) {
       return
     }
 
@@ -48,6 +50,8 @@ export function useEmployeeRealtimeNotifications() {
           signal: abortController.signal,
         })
 
+        // On 4xx errors (e.g. 401 unauthenticated, 403 unverified/forbidden, 404 not found),
+        // stop immediately and do not attempt to reconnect.
         if (!response.ok || !response.body) {
           isConnectingRef.current = false
           return
@@ -114,5 +118,5 @@ export function useEmployeeRealtimeNotifications() {
       abortControllerRef.current = null
       isConnectingRef.current = false
     }
-  }, [isEmployee, token, queryClient, navigate])
+  }, [isEmployee, isVerified, token, queryClient, navigate])
 }
