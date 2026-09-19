@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -20,6 +20,19 @@ export default function VerifyEmailPage() {
   const [code, setCode] = useState('')
   const [error, setError] = useState(false)
 
+  // If user is already verified, redirect directly to dashboard
+  useEffect(() => {
+    if (user?.email_verified_at) {
+      if (user.role === 'employer') {
+        navigate('/employer-dashboard', { replace: true })
+      } else if (user.role === 'admin') {
+        navigate('/admin', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
+    }
+  }, [user, navigate])
+
   const verifyMutation = useMutation({
     mutationFn: (submittedCode: string) => api.post('/email/verify-otp', { code: submittedCode }),
     onSuccess: async () => {
@@ -27,6 +40,8 @@ export default function VerifyEmailPage() {
       const updatedUser = await getProfile()
       if (updatedUser?.role === 'employer') {
         navigate('/employer-dashboard')
+      } else if (updatedUser?.role === 'admin') {
+        navigate('/admin')
       } else {
         navigate('/dashboard')
       }
@@ -39,6 +54,12 @@ export default function VerifyEmailPage() {
 
   const resendMutation = useMutation({
     mutationFn: () => api.post('/email/resend'),
+    onSuccess: () => {
+      toast.success('A new verification code has been sent to your email.')
+    },
+    onError: () => {
+      toast.error('Failed to resend code. Please wait before trying again.')
+    },
   })
 
   const handleCodeChange = (newCode: string) => {
@@ -73,7 +94,7 @@ export default function VerifyEmailPage() {
             <MailCheck className="h-5 w-5" />
           </div>
           <CardTitle className="text-xl font-bold tracking-tight text-foreground">
-            {t('otp.registerTitle')}
+            {t('otp.registerTitle', 'Verify your email')}
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
             {t('otp.codeSentTo', { email: user?.email ?? '' })}
@@ -86,6 +107,7 @@ export default function VerifyEmailPage() {
                 value={code}
                 onChange={handleCodeChange}
                 onComplete={handleComplete}
+                autoSubmit={false}
                 disabled={verifyMutation.isPending}
                 error={error}
               />

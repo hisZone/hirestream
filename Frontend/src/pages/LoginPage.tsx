@@ -21,8 +21,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   const loginSchema = z.object({
-    login: z.string().min(1, t('auth.emailRequired')),
-    password: z.string().min(1, t('auth.passwordRequired')),
+    login: z.string().min(1, t('auth.emailOrUsernameRequired', 'Email or username is required')),
+    password: z.string().min(1, t('auth.passwordRequired', 'Password is required')),
   })
 
   type LoginForm = z.infer<typeof loginSchema>
@@ -39,6 +39,13 @@ export default function LoginPage() {
     try {
       const user = await login(data)
       toast.success('Logged in successfully')
+
+      // Option A: If email is unverified, immediately redirect to OTP verification page
+      if (user && !user.email_verified_at) {
+        navigate('/verify-email')
+        return
+      }
+
       if (user?.role === 'employer') {
         navigate('/employer-dashboard')
       } else if (user?.role === 'employee') {
@@ -69,17 +76,17 @@ export default function LoginPage() {
             <LogIn className="h-5 w-5" />
           </div>
           <CardTitle className="text-xl font-bold tracking-tight text-foreground">
-            {t('auth.loginTitle')}
+            {t('auth.loginTitle', 'Welcome back')}
           </CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
-            {t('auth.loginSubtitle')}
+            {t('auth.loginSubtitle', 'Sign in to your account')}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="login" className="text-xs font-medium text-foreground">
-                {t('auth.emailOrUsername')}
+                {t('auth.emailOrUsername', 'Email or username')}
               </Label>
               <Input
                 id="login"
@@ -98,13 +105,13 @@ export default function LoginPage() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-xs font-medium text-foreground">
-                  {t('auth.password')}
+                  {t('auth.password', 'Password')}
                 </Label>
                 <Link
                   to="/forgot-password"
-                  className="text-xs text-primary underline-offset-4 hover:underline"
+                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                 >
-                  {t('auth.forgotPassword', 'Forgot password?')}
+                  {t('auth.forgotPassword', 'Forgot Password?')}
                 </Link>
               </div>
               <div className="relative">
@@ -143,16 +150,16 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                  {t('common.loading')}
+                  {t('common.loading', 'Loading...')}
                 </>
               ) : (
-                t('auth.loginButton')
+                t('auth.loginButton', 'Sign In')
               )}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              {t('auth.noAccount')}{' '}
+              {t('auth.noAccount', "Don't have an account?")}{' '}
               <Link to="/register" className="text-primary font-medium underline-offset-4 hover:underline">
-                {t('auth.register')}
+                {t('auth.signUp', 'Sign Up')}
               </Link>
             </p>
           </CardFooter>

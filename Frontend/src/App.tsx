@@ -67,8 +67,14 @@ function LoadingFallback() {
   )
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isInitialized } = useAuthStore()
+function ProtectedRoute({
+  children,
+  requireVerification = true,
+}: {
+  children: React.ReactNode
+  requireVerification?: boolean
+}) {
+  const { isAuthenticated, isInitialized, user } = useAuthStore()
 
   if (!isInitialized) {
     return <LoadingFallback />
@@ -76,6 +82,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (requireVerification && user && !user.email_verified_at) {
+    return <Navigate to="/verify-email" replace />
   }
 
   return <>{children}</>
@@ -96,6 +106,10 @@ function RoleProtectedRoute({
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (user && !user.email_verified_at) {
+    return <Navigate to="/verify-email" replace />
   }
 
   if (user && !hasRole(allowedRoles)) {
@@ -121,6 +135,9 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated) {
+    if (user && !user.email_verified_at) {
+      return <Navigate to="/verify-email" replace />
+    }
     const defaultPath =
       user?.role === 'employer'
         ? '/employer-dashboard'
@@ -168,7 +185,7 @@ export default function App() {
               <Route
                 path="/verify-email"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requireVerification={false}>
                     <VerifyEmailPage />
                   </ProtectedRoute>
                 }
@@ -220,7 +237,7 @@ export default function App() {
               />
 
               <Route
-                path="/create-job"
+                path="/jobs/create"
                 element={
                   <RoleProtectedRoute allowedRoles={['employer', 'admin']}>
                     <CreateJobPage />
@@ -229,7 +246,7 @@ export default function App() {
               />
 
               <Route
-                path="/edit-job"
+                path="/jobs/:id/edit"
                 element={
                   <RoleProtectedRoute allowedRoles={['employer', 'admin']}>
                     <EditJobPage />
@@ -238,7 +255,7 @@ export default function App() {
               />
 
               <Route
-                path="/job-applicants"
+                path="/jobs/:id/applicants"
                 element={
                   <RoleProtectedRoute allowedRoles={['employer', 'admin']}>
                     <JobApplicantsPage />
@@ -247,7 +264,7 @@ export default function App() {
               />
 
               <Route
-                path="/applicant-details"
+                path="/jobs/:jobId/applicants/:applicantId"
                 element={
                   <RoleProtectedRoute allowedRoles={['employer', 'admin']}>
                     <ApplicantDetailsPage />
@@ -328,7 +345,7 @@ export default function App() {
 
               {/* Admin Routes - nested under AdminLayoutPage so the sidebar/header
                  render once and every sub-page shows inside it via <Outlet />.
-                 Only the parent needs ProtectedRoute; children inherit the guard. */}
+                 AdminLayoutPage itself checks the admin role before rendering. */}
               <Route
                 path="/admin"
                 element={
@@ -337,19 +354,25 @@ export default function App() {
                   </RoleProtectedRoute>
                 }
               >
+                {/* /admin -> Overview */}
                 <Route index element={<AdminOverviewPage />} />
-                <Route path="overview" element={<AdminOverviewPage />} />
-                <Route path="applications" element={<AdminApplicationsPage />} />
-                <Route path="jobs" element={<AdminJobsPage />} />
+                {/* /admin/users -> Users list */}
                 <Route path="users" element={<AdminUsersPage />} />
+                {/* /admin/jobs -> Job Postings */}
+                <Route path="jobs" element={<AdminJobsPage />} />
+                {/* /admin/applications -> All Applications */}
+                <Route path="applications" element={<AdminApplicationsPage />} />
+                {/* /admin/companies -> Companies */}
                 <Route path="companies" element={<AdmincompaniesPage />} />
+                {/* /admin/settings -> System Settings */}
                 <Route path="settings" element={<AdminSettingsPage />} />
               </Route>
 
+              {/* Catch-all 404 */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
-            <Toaster position="top-right" richColors />
           
+          <Toaster richColors position="top-right" />
         </AuthInitializer>
       </QueryClientProvider>
     </ErrorBoundary>
