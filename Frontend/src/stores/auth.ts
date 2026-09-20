@@ -3,6 +3,8 @@ import api from '@/lib/api'
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types'
 import i18n from '@/i18n'
 
+export type { User }
+
 interface AuthState {
   user: User | null
   token: string | null
