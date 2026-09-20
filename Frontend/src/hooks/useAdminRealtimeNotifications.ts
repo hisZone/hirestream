@@ -13,8 +13,10 @@ export function useAdminRealtimeNotifications() {
   const abortControllerRef = useRef<AbortController | null>(null)
   const isConnectingRef = useRef(false)
 
+  const isVerifiedAdmin = isAuthenticated && user?.role === 'admin' && Boolean(user?.email_verified_at)
+
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'admin' || !token) {
+    if (!isVerifiedAdmin || !token) {
       return
     }
 
@@ -36,7 +38,8 @@ export function useAdminRealtimeNotifications() {
         })
 
         if (!response.ok || !response.body) {
-          throw new Error(`SSE stream failed with status ${response.status}`)
+          isConnectingRef.current = false
+          return
         }
 
         const reader = response.body.getReader()
@@ -103,5 +106,5 @@ export function useAdminRealtimeNotifications() {
         abortControllerRef.current.abort()
       }
     }
-  }, [isAuthenticated, user?.role, token, queryClient, navigate])
+  }, [isVerifiedAdmin, token, queryClient, navigate])
 }

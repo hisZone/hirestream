@@ -22,10 +22,10 @@ export function useEmployerRealtimeNotifications() {
   const abortControllerRef = useRef<AbortController | null>(null)
   const isConnectingRef = useRef(false)
 
-  const isEmployer = user?.role === 'employer'
+  const isVerifiedEmployer = user?.role === 'employer' && Boolean(user?.email_verified_at)
 
   useEffect(() => {
-    if (!isEmployer || !token) {
+    if (!isVerifiedEmployer || !token) {
       return
     }
 
@@ -48,6 +48,7 @@ export function useEmployerRealtimeNotifications() {
           signal: abortController.signal,
         })
 
+        // If client error (401, 403, 404) or bad body, halt permanently
         if (!response.ok || !response.body) {
           isConnectingRef.current = false
           return
@@ -114,5 +115,5 @@ export function useEmployerRealtimeNotifications() {
       abortControllerRef.current = null
       isConnectingRef.current = false
     }
-  }, [isEmployer, token, queryClient, navigate])
+  }, [isVerifiedEmployer, token, queryClient, navigate])
 }

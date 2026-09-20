@@ -15,6 +15,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/auth'
 import { employerNotificationService } from '@/services/employerNotificationService'
 import type { EmployerNotification } from '@/types'
 
@@ -24,22 +25,35 @@ export default function EmployerNotificationDropdown() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
 
-  // Poll unread count every 30 seconds as background fallback
+  const isVerifiedEmployer = user?.role === 'employer' && Boolean(user?.email_verified_at)
+
+  // Poll unread count every 30 seconds as background fallback (only when verified)
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['employer-notifications-unread-count'],
     queryFn: () => employerNotificationService.getUnreadCount(),
-    refetchInterval: 30000,
+    enabled: isVerifiedEmployer,
+    refetchInterval: isVerifiedEmployer ? 30000 : false,
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 403 || error?.response?.status === 401) return false
+      return failureCount < 2
+    },
   })
 
-  // Fetch notifications list
+  // Fetch notifications list (only when verified)
   const {
     data: notificationsData,
     isLoading,
   } = useQuery({
     queryKey: ['employer-notifications', filterUnread],
     queryFn: () => employerNotificationService.getNotifications({ unread: filterUnread || undefined, per_page: 15 }),
-    refetchInterval: isOpen ? 15000 : 30000,
+    enabled: isVerifiedEmployer,
+    refetchInterval: isVerifiedEmployer ? (isOpen ? 15000 : 30000) : false,
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 403 || error?.response?.status === 401) return false
+      return failureCount < 2
+    },
   })
 
   // Mark single notification as read mutation

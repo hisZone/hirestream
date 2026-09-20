@@ -41,7 +41,7 @@ export default function LoginPage() {
       toast.success('Logged in successfully')
 
       // Option A: If email is unverified, immediately redirect to OTP verification page
-      if (user && !user.email_verified_at) {
+      if (!user?.email_verified_at) {
         navigate('/verify-email')
         return
       }

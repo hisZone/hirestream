@@ -1,45 +1,14 @@
 import { create } from 'zustand'
-import i18n from '@/i18n'
 import api from '@/lib/api'
-
-export interface User {
-  id: number
-  name: string
-  email: string
-  username: string
-  role: 'employee' | 'employer' | 'admin'
-  role_label: string
-  email_verified_at: string | null
-  cv_path: string | null
-  cv_original_name: string | null
-  cv_uploaded_at: string | null
-}
-
-interface LoginRequest {
-  login: string
-  password: string
-}
-
-interface RegisterRequest {
-  name: string
-  email: string
-  username: string
-  password: string
-  password_confirmation: string
-  role: 'employee' | 'employer' | 'admin'
-}
-
-interface AuthResponse {
-  user: User
-  access_token: string
-}
+import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types'
+import i18n from '@/i18n'
 
 interface AuthState {
   user: User | null
   token: string | null
   isLoading: boolean
-  isAuthenticated: boolean
   isInitialized: boolean
+  isAuthenticated: boolean
   login: (data: LoginRequest) => Promise<User>
   register: (data: RegisterRequest) => Promise<User>
   logout: () => Promise<void>
@@ -62,7 +31,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const response = await api.post('/login', data)
       const resData = response.data
       const authData: AuthResponse = resData.data ?? resData
-      const { user, access_token } = authData
+      const user = (authData.user ?? (authData as unknown as User)) as User
+      const access_token = authData.access_token ?? resData.access_token
       localStorage.setItem('token', access_token)
       set({ user, token: access_token, isAuthenticated: true, isLoading: false, isInitialized: true })
       return user
@@ -78,7 +48,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const response = await api.post('/register', data)
       const resData = response.data
       const authData: AuthResponse = resData.data ?? resData
-      const { user, access_token } = authData
+      const user = (authData.user ?? (authData as unknown as User)) as User
+      const access_token = authData.access_token ?? resData.access_token
       localStorage.setItem('token', access_token)
       set({ user, token: access_token, isAuthenticated: true, isLoading: false, isInitialized: true })
       return user
@@ -105,7 +76,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const response = await api.get('/profile')
       const resData = response.data
-      const userData: User = resData.data ?? resData
+      const userData: User = resData.data?.user ?? resData.data ?? resData.user ?? resData
       set({ user: userData, isLoading: false })
       return userData
     } catch (error) {

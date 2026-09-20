@@ -12,6 +12,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuthStore } from '@/stores/auth'
 import { adminNotificationService } from '@/services/adminNotificationService'
 import type { AdminNotification } from '@/types'
 
@@ -21,22 +22,35 @@ export default function AdminNotificationDropdown() {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
 
-  // Poll unread count every 30 seconds as background fallback
+  const isVerifiedAdmin = Boolean(user?.email_verified_at)
+
+  // Poll unread count every 30 seconds as background fallback (only when verified)
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['admin-notifications-unread-count'],
     queryFn: () => adminNotificationService.getUnreadCount(),
-    refetchInterval: 30000,
+    enabled: isVerifiedAdmin,
+    refetchInterval: isVerifiedAdmin ? 30000 : false,
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 403 || error?.response?.status === 401) return false
+      return failureCount < 2
+    },
   })
 
-  // Fetch notifications list
+  // Fetch notifications list (only when verified)
   const {
     data: notificationsData,
     isLoading,
   } = useQuery({
     queryKey: ['admin-notifications', filterUnread],
     queryFn: () => adminNotificationService.getNotifications({ unread: filterUnread || undefined, per_page: 15 }),
-    refetchInterval: isOpen ? 15000 : 30000,
+    enabled: isVerifiedAdmin,
+    refetchInterval: isVerifiedAdmin ? (isOpen ? 15000 : 30000) : false,
+    retry: (failureCount, error: any) => {
+      if (error?.response?.status === 403 || error?.response?.status === 401) return false
+      return failureCount < 2
+    },
   })
 
   // Mark single notification as read mutation
@@ -96,13 +110,13 @@ export default function AdminNotificationDropdown() {
   }, [isOpen])
 
   const handleNotificationClick = (notification: AdminNotification) => {
-    if (!notification.is_read) {
+    if (!notification.read_at) {
       markAsReadMutation.mutate(notification.id)
     }
 
     setIsOpen(false)
 
-    const targetUrl = notification.data.action_url
+    const targetUrl = notification.action_url || notification.data?.action_url
     if (targetUrl) {
       navigate(targetUrl)
     }
@@ -112,12 +126,12 @@ export default function AdminNotificationDropdown() {
 
   const getNotificationIcon = (type?: string) => {
     switch (type) {
-      case 'job_submitted_for_review':
-        return <BriefcaseBusiness size={16} className="text-blue-600 dark:text-blue-400" />
       case 'employer_pending_approval':
-        return <Building2 size={16} className="text-amber-600 dark:text-amber-400" />
+        return <Building2 size={18} className="text-amber-600 dark:text-amber-400" />
+      case 'job_post_pending_approval':
+        return <BriefcaseBusiness size={18} className="text-blue-600 dark:text-blue-400" />
       default:
-        return <Bell size={16} className="text-muted-foreground" />
+        return <Bell size={18} className="text-slate-600 dark:text-slate-400" />
     }
   }
 
@@ -125,16 +139,17 @@ export default function AdminNotificationDropdown() {
     <div className="relative" ref={dropdownRef}>
       {/* Trigger Button */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors focus:outline-none"
-        title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'Admin Notifications'}
-        aria-label="Admin Notifications"
+        className="relative rounded-full p-2 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'Notifications'}
+        aria-label="Notifications"
         aria-expanded={isOpen}
       >
-        <Bell size={19} />
+        <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-rose-600 text-white text-[10px] font-bold rounded-full border-2 border-background shadow-xs animate-pulse"
+            className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-[20px] px-1 bg-red-600 text-white text-[11px] font-bold rounded-full border-2 border-background shadow-sm ring-1 ring-red-500/20 animate-pulse"
             aria-live="polite"
           >
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -144,13 +159,13 @@ export default function AdminNotificationDropdown() {
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-popover text-popover-foreground rounded-xl shadow-2xl border border-border z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-background rounded-xl shadow-xl border border-border z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Header */}
-          <div className="p-3.5 border-b border-border/70 flex items-center justify-between bg-muted/30">
+          <div className="p-4 border-b border-border flex items-center justify-between bg-muted/40">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-foreground text-xs uppercase tracking-wider">Notifications</h3>
+              <h3 className="font-semibold text-foreground text-sm">Notifications</h3>
               {unreadCount > 0 && (
-                <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded-full font-medium border border-blue-500/20">
+                <span className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs px-2 py-0.5 rounded-full font-medium">
                   {unreadCount} new
                 </span>
               )}
@@ -160,48 +175,52 @@ export default function AdminNotificationDropdown() {
               <button
                 onClick={() => markAllAsReadMutation.mutate()}
                 disabled={markAllAsReadMutation.isPending}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
               >
-                <CheckCheck size={13} />
+                <CheckCheck size={14} />
                 Mark all read
               </button>
             )}
           </div>
 
           {/* Filter Bar */}
-          <div className="flex border-b border-border/60 px-3 py-1.5 bg-popover text-xs gap-1.5">
+          <div className="flex border-b border-border px-4 py-2 bg-background text-xs gap-2">
             <button
               onClick={() => setFilterUnread(false)}
-              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
-                !filterUnread ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted/50'
+              className={`px-2.5 py-1 rounded-md transition-colors ${
+                !filterUnread
+                  ? 'bg-muted text-foreground font-medium'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               All
             </button>
             <button
               onClick={() => setFilterUnread(true)}
-              className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
-                filterUnread ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:bg-muted/50'
+              className={`px-2.5 py-1 rounded-md transition-colors ${
+                filterUnread
+                  ? 'bg-muted text-foreground font-medium'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Unread only
+              Unread
             </button>
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-border/50">
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-border">
             {isLoading ? (
               <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                <Loader2 size={24} className="animate-spin text-blue-600" />
                 <span className="text-xs">Loading notifications...</span>
               </div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-1">
-                  <Bell size={18} />
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-1">
+                  <Bell size={20} />
                 </div>
-                <p className="text-xs font-medium text-foreground">No notifications</p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-sm font-medium text-foreground">No notifications</p>
+                <p className="text-xs text-muted-foreground">
                   {filterUnread ? 'No unread notifications right now' : 'You are all caught up!'}
                 </p>
               </div>
@@ -209,55 +228,55 @@ export default function AdminNotificationDropdown() {
               notifications.map((item) => (
                 <div
                   key={item.id}
-                  className={`p-3.5 flex gap-3 transition-colors hover:bg-muted/40 cursor-pointer relative group ${
-                    !item.is_read ? 'bg-blue-500/5 dark:bg-blue-500/10' : ''
+                  className={`p-4 flex gap-3 transition-colors hover:bg-muted/60 cursor-pointer relative group ${
+                    !item.read_at ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''
                   }`}
                   onClick={() => handleNotificationClick(item)}
                 >
                   {/* Icon Indicator */}
-                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
-                    {getNotificationIcon(item.data.type)}
+                  <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {getNotificationIcon(item.type || item.data?.type)}
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0 pr-6">
                     <div className="flex items-center gap-1.5">
-                      <p className={`text-xs font-semibold ${!item.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        {item.data.title ?? 'System Notification'}
+                      <p className={`text-xs font-semibold ${!item.read_at ? 'text-foreground font-bold' : 'text-foreground/80'}`}>
+                        {item.title || item.data?.title || 'System Notification'}
                       </p>
-                      {!item.is_read && (
+                      {!item.read_at && (
                         <span className="w-1.5 h-1.5 bg-blue-600 rounded-full flex-shrink-0" />
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-                      {item.data.message}
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                      {item.message || item.data?.message}
                     </p>
-                    <div className="flex items-center gap-1 mt-1.5 text-[10px] text-muted-foreground/80">
-                      <Clock size={11} />
+                    <div className="flex items-center gap-1 mt-1.5 text-[11px] text-muted-foreground">
+                      <Clock size={12} />
                       <span>{item.created_at_human ?? new Date(item.created_at).toLocaleString()}</span>
                     </div>
                   </div>
 
                   {/* Item Actions */}
                   <div
-                    className="absolute right-2.5 top-2.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute right-3 top-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {!item.is_read && (
+                    {!item.read_at && (
                       <button
                         onClick={() => markAsReadMutation.mutate(item.id)}
-                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        className="p-1 rounded text-muted-foreground hover:text-blue-600 hover:bg-background transition-colors"
                         title="Mark as read"
                       >
-                        <Check size={13} />
+                        <Check size={14} />
                       </button>
                     )}
                     <button
                       onClick={() => deleteMutation.mutate(item.id)}
-                      className="p-1 rounded text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-muted transition-colors"
+                      className="p-1 rounded text-muted-foreground hover:text-rose-600 hover:bg-background transition-colors"
                       title="Delete"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
@@ -267,10 +286,16 @@ export default function AdminNotificationDropdown() {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="p-2 border-t border-border/60 bg-muted/20 text-center">
-              <span className="text-[10px] text-muted-foreground">
-                Showing {notifications.length} recent notifications
-              </span>
+            <div className="p-2.5 border-t border-border bg-muted/40 text-center">
+              <button
+                onClick={() => {
+                  setIsOpen(false)
+                  navigate('/admin')
+                }}
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+              >
+                Go to Admin Overview →
+              </button>
             </div>
           )}
         </div>

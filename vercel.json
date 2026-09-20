@@ -7,6 +7,10 @@
   "installCommand": "cd Frontend && npm install",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://job-listing-backend-qto1.onrender.com/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

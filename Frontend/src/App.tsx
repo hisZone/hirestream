@@ -84,7 +84,7 @@ function ProtectedRoute({
     return <Navigate to="/login" replace />
   }
 
-  if (requireVerification && user && !user.email_verified_at) {
+  if (requireVerification && !user?.email_verified_at) {
     return <Navigate to="/verify-email" replace />
   }
 
@@ -108,7 +108,7 @@ function RoleProtectedRoute({
     return <Navigate to="/login" replace />
   }
 
-  if (user && !user.email_verified_at) {
+  if (!user?.email_verified_at) {
     return <Navigate to="/verify-email" replace />
   }
 
@@ -135,7 +135,7 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (isAuthenticated) {
-    if (user && !user.email_verified_at) {
+    if (!user?.email_verified_at) {
       return <Navigate to="/verify-email" replace />
     }
     const defaultPath =
